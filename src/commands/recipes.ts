@@ -56,6 +56,7 @@ export function setupRecipeCommands(program: Command) {
         if (agentRecipe.prepTime) recipeData.prepTime = agentRecipe.prepTime;
         if (agentRecipe.cookTime) recipeData.cookTime = agentRecipe.cookTime;
         if (agentRecipe.recipeYield) recipeData.recipeYield = agentRecipe.recipeYield;
+        if (agentRecipe.recipeServings !== undefined) recipeData.recipeServings = agentRecipe.recipeServings;
 
         // Ensure tags, categories, tools
         if (agentRecipe.tags) {
@@ -91,11 +92,38 @@ export function setupRecipeCommands(program: Command) {
           recipeData.recipeIngredient = agentRecipe.ingredients.map((ing) => {
             const id = crypto.randomUUID();
             ingredientIds.push(id);
-            const note = typeof ing === "string" ? ing : ing.note;
-            return {
-              referenceId: id,
-              note: note,
-            };
+            if (typeof ing === "string") {
+              return {
+                referenceId: id,
+                note: ing,
+              };
+            } else {
+              const ingObj: any = {
+                referenceId: id,
+                note: ing.note || "",
+              };
+              if (ing.quantity !== undefined && ing.quantity !== null) ingObj.quantity = ing.quantity;
+              if (ing.display) ingObj.display = ing.display;
+              if (ing.title) ingObj.title = ing.title;
+              if (ing.originalText) ingObj.originalText = ing.originalText;
+              
+              if (ing.unit && ing.unit.name) {
+                ingObj.unit = {
+                  name: ing.unit.name,
+                  description: ing.unit.description || "",
+                  fraction: ing.unit.fraction ?? true,
+                  abbreviation: ing.unit.abbreviation || ""
+                };
+              }
+              if (ing.food && ing.food.name) {
+                ingObj.food = {
+                  name: ing.food.name,
+                  description: ing.food.description || ""
+                };
+              }
+              
+              return ingObj;
+            }
           });
         }
 
@@ -170,6 +198,7 @@ export function setupRecipeCommands(program: Command) {
             slug: recipe.slug,
             description: recipe.description,
             recipeYield: recipe.recipeYield,
+            recipeServings: recipe.recipeServings,
             totalTime: recipe.totalTime,
             prepTime: recipe.prepTime,
             cookTime: recipe.cookTime,

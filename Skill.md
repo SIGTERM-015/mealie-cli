@@ -30,12 +30,24 @@ Generate a JSON file (e.g., `recipe.json`) adhering to this schema. You do NOT n
   "prepTime": "15m",
   "cookTime": "10m",
   "recipeYield": "2 pizzas",
+  "recipeServings": 4,
   "tags": ["pizza", "italiana"],
   "categories": ["Cena"],
   "tools": ["Horno", "Piedra de pizza"],
   "ingredients": [
-    "500g de harina de fuerza",
-    "300ml de agua",
+    {
+      "quantity": 500,
+      "unit": { "name": "gramos", "abbreviation": "gr" },
+      "food": { "name": "harina de fuerza" },
+      "note": "tamizada",
+      "display": "500gr de harina de fuerza tamizada"
+    },
+    {
+      "quantity": 300,
+      "unit": { "name": "ml", "abbreviation": "ml" },
+      "food": { "name": "agua" },
+      "note": "tibia"
+    },
     "10g de sal",
     "3g de levadura fresca",
     "Salsa de tomate casera",
@@ -65,7 +77,7 @@ Generate a JSON file (e.g., `recipe.json`) adhering to this schema. You do NOT n
 }
 ```
 
-*Note: All fields except `name`, `ingredients`, and `instructions` are optional. The `instructions` array can contain simple strings, or objects with `section` (for section headers), `title` (for the step name), `text` (for the actual instruction), and `ingredientIndices` (an array of numbers corresponding to the zero-based index of the items in your `ingredients` array, which automatically links the ingredients to the step!).*
+*Note: All fields except `name`, `ingredients`, and `instructions` are optional. You can specify `recipeServings` (as a number) to enable portion scaling in Mealie. The `ingredients` array can contain simple strings, or detailed objects containing `quantity`, `unit` (with `name` and `abbreviation`), `food` (with `name`), `note`, and `display` for full control over how the ingredient is parsed in Mealie. The `instructions` array can contain simple strings, or objects with `section` (for section headers), `title` (for the step name), `text` (for the actual instruction), and `ingredientIndices` (an array of numbers corresponding to the zero-based index of the items in your `ingredients` array, which automatically links the ingredients to the step!).*
 
 ### Step 2: Execute the Command
 Run the CLI passing the path to the JSON file you just created:
