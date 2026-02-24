@@ -89,42 +89,47 @@ export function setupRecipeCommands(program: Command) {
         // Map ingredients and instructions
         const ingredientIds: string[] = [];
         if (agentRecipe.ingredients) {
-          recipeData.recipeIngredient = agentRecipe.ingredients.map((ing) => {
-            const id = crypto.randomUUID();
-            ingredientIds.push(id);
-            if (typeof ing === "string") {
-              return {
-                referenceId: id,
-                note: ing,
-              };
-            } else {
-              const ingObj: any = {
-                referenceId: id,
-                note: ing.note || "",
-              };
-              if (ing.quantity !== undefined && ing.quantity !== null) ingObj.quantity = ing.quantity;
-              if (ing.display) ingObj.display = ing.display;
-              if (ing.title) ingObj.title = ing.title;
-              if (ing.originalText) ingObj.originalText = ing.originalText;
-              
-              if (ing.unit && ing.unit.name) {
-                ingObj.unit = {
-                  name: ing.unit.name,
-                  description: ing.unit.description || "",
-                  fraction: ing.unit.fraction ?? true,
-                  abbreviation: ing.unit.abbreviation || ""
+          recipeData.recipeIngredient = await Promise.all(
+            agentRecipe.ingredients.map(async (ing) => {
+              const id = crypto.randomUUID();
+              ingredientIds.push(id);
+              if (typeof ing === "string") {
+                return {
+                  referenceId: id,
+                  note: ing,
                 };
-              }
-              if (ing.food && ing.food.name) {
-                ingObj.food = {
-                  name: ing.food.name,
-                  description: ing.food.description || ""
+              } else {
+                const ingObj: any = {
+                  referenceId: id,
+                  note: ing.note || "",
                 };
+                if (ing.quantity !== undefined && ing.quantity !== null) ingObj.quantity = ing.quantity;
+                if (ing.display) ingObj.display = ing.display;
+                if (ing.title) ingObj.title = ing.title;
+                if (ing.originalText) ingObj.originalText = ing.originalText;
+                
+                if (ing.unit && ing.unit.name) {
+                  const extraData = {
+                    description: ing.unit.description || "",
+                    fraction: ing.unit.fraction ?? true,
+                    abbreviation: ing.unit.abbreviation || ""
+                  };
+                  const resolvedUnit = await ensureOrganizer(client, "/api/units", ing.unit.name, extraData);
+                  if (resolvedUnit) ingObj.unit = resolvedUnit;
+                }
+                
+                if (ing.food && ing.food.name) {
+                  const extraData = {
+                    description: ing.food.description || ""
+                  };
+                  const resolvedFood = await ensureOrganizer(client, "/api/foods", ing.food.name, extraData);
+                  if (resolvedFood) ingObj.food = resolvedFood;
+                }
+                
+                return ingObj;
               }
-              
-              return ingObj;
-            }
-          });
+            })
+          );
         }
 
         if (agentRecipe.instructions) {

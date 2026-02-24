@@ -11,14 +11,14 @@ export function outputError(message: string, details?: any): void {
   process.exitCode = 1;
 }
 
-export async function ensureOrganizer(client: any, endpoint: string, name: string) {
+export async function ensureOrganizer(client: any, endpoint: string, name: string, extraData: any = {}) {
   const res = await client.get(endpoint, { search: name });
   const items = res.items || res;
   let found = items.find((i: any) => i.name.toLowerCase() === name.toLowerCase());
 
   if (!found) {
     try {
-      found = await client.post(endpoint, { name });
+      found = await client.post(endpoint, { name, ...extraData });
     } catch (e) {
       // If it fails (e.g., already exists but wasn't in list), try one more fetch
       const res2 = await client.get(endpoint, { search: name });
