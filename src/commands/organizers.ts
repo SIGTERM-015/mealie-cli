@@ -1,6 +1,7 @@
 import { Command } from "commander";
 import { getClient } from "../api";
-import { handleAction } from "../utils";
+import { handleAction, ensureOrganizer } from "../utils";
+import { TagOut, CategoryOut, RecipeToolOut } from "../models/types";
 
 export function setupOrganizerCommands(program: Command) {
   const tagCmd = program.command("tag").description("Manage tags");
@@ -12,14 +13,7 @@ export function setupOrganizerCommands(program: Command) {
     .action((options) => {
       handleAction(async () => {
         const client = getClient();
-        const tagsRes = await client.get<any>("/api/organizers/tags");
-        const tags = tagsRes.items || tagsRes;
-        const existing = tags.find((t: any) => t.name.toLowerCase() === options.name.toLowerCase());
-        if (existing) {
-          return existing;
-        }
-        const created = await client.post<any>("/api/organizers/tags", { name: options.name });
-        return created;
+        return await ensureOrganizer<TagOut>(client, "/api/organizers/tags", options.name);
       });
     });
 
@@ -32,14 +26,7 @@ export function setupOrganizerCommands(program: Command) {
     .action((options) => {
       handleAction(async () => {
         const client = getClient();
-        const catRes = await client.get<any>("/api/organizers/categories");
-        const categories = catRes.items || catRes;
-        const existing = categories.find((c: any) => c.name.toLowerCase() === options.name.toLowerCase());
-        if (existing) {
-          return existing;
-        }
-        const created = await client.post<any>("/api/organizers/categories", { name: options.name });
-        return created;
+        return await ensureOrganizer<CategoryOut>(client, "/api/organizers/categories", options.name);
       });
     });
 
@@ -52,14 +39,7 @@ export function setupOrganizerCommands(program: Command) {
     .action((options) => {
       handleAction(async () => {
         const client = getClient();
-        const toolRes = await client.get<any>("/api/organizers/tools");
-        const tools = toolRes.items || toolRes;
-        const existing = tools.find((t: any) => t.name.toLowerCase() === options.name.toLowerCase());
-        if (existing) {
-          return existing;
-        }
-        const created = await client.post<any>("/api/organizers/tools", { name: options.name });
-        return created;
+        return await ensureOrganizer<RecipeToolOut>(client, "/api/organizers/tools", options.name);
       });
     });
 }

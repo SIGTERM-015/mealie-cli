@@ -1,6 +1,7 @@
 import { Command } from "commander";
 import { getClient } from "../api";
-import { handleAction } from "../utils";
+import { handleAction, extractItems } from "../utils";
+import { ShoppingListOut, MultiPurposeLabelOut, ShoppingListItemsCollectionOut } from "../models/types";
 
 export function setupShoppingListCommands(program: Command) {
   const listCmd = program.command("shopping-list").description("Manage shopping lists");
@@ -12,16 +13,16 @@ export function setupShoppingListCommands(program: Command) {
     .action((options) => {
       handleAction(async () => {
         const client = getClient();
-        const lists = await client.get<any>("/api/households/shopping/lists");
+        const lists = await client.get<ShoppingListOut[]>("/api/households/shopping/lists");
         // /api/households/shopping/lists returns an array or pagination object? 
         // Based on openapi it returns ShoppingListOut[], wait let's assume it returns an array
         // In openapi it returns ShoppingListPagination... oh wait
-        const items = lists.items || lists;
-        const existing = items.find((l: any) => l.name.toLowerCase() === options.name.toLowerCase());
+        const items = extractItems<ShoppingListOut>(lists);
+        const existing = items.find((l) => l.name?.toLowerCase() === options.name.toLowerCase());
         if (existing) {
           return existing;
         }
-        const created = await client.post<any>("/api/households/shopping/lists", { name: options.name });
+        const created = await client.post<ShoppingListOut>("/api/households/shopping/lists", { name: options.name });
         return created;
       });
     });
@@ -35,16 +36,16 @@ export function setupShoppingListCommands(program: Command) {
     .action((options) => {
       handleAction(async () => {
         const client = getClient();
-        let labelId: string | null = null;
+        let labelId: string | null | undefined = null;
 
         if (options.label) {
           // Ensure label exists
-          const labelsRes = await client.get<any>("/api/groups/labels");
-          const labels = labelsRes.items || labelsRes;
-          let label = labels.find((l: any) => l.name.toLowerCase() === options.label.toLowerCase());
+          const labelsRes = await client.get<MultiPurposeLabelOut[]>("/api/groups/labels");
+          const labels = extractItems<MultiPurposeLabelOut>(labelsRes);
+          let label = labels.find((l) => l.name?.toLowerCase() === options.label.toLowerCase());
 
           if (!label) {
-            label = await client.post<any>("/api/groups/labels", {
+            label = await client.post<MultiPurposeLabelOut>("/api/groups/labels", {
               name: options.label,
               color: "#959595" // default color
             });
@@ -52,7 +53,7 @@ export function setupShoppingListCommands(program: Command) {
           labelId = label.id;
         }
 
-        const created = await client.post<any>("/api/households/shopping/items", {
+        const created = await client.post<ShoppingListItemsCollectionOut>("/api/households/shopping/items", {
           shoppingListId: options.listId,
           note: options.note,
           display: options.note,
@@ -72,7 +73,7 @@ export function setupShoppingListCommands(program: Command) {
     .action((options) => {
       handleAction(async () => {
         const client = getClient();
-        const created = await client.post<any>(`/api/households/shopping/lists/${options.listId}/recipe`, {
+        const created = await client.post<ShoppingListOut>(`/api/households/shopping/lists/${options.listId}/recipe`, {
           recipeId: options.recipeId
         });
         return created;

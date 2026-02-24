@@ -5,9 +5,9 @@ dotenv.config();
 
 export class MealieApiError extends Error {
   public statusCode: number | undefined;
-  public responseData: any;
+  public responseData: unknown;
 
-  constructor(message: string, statusCode?: number, responseData?: any) {
+  constructor(message: string, statusCode?: number, responseData?: unknown) {
     super(message);
     this.name = "MealieApiError";
     this.statusCode = statusCode;
@@ -36,7 +36,7 @@ export class MealieClient {
         Authorization: `Bearer ${token}`,
         "Content-Type": "application/json",
       },
-      timeout: 60000,
+      timeout: parseInt(process.env.MEALIE_TIMEOUT || "60000", 10),
     });
 
     // Response interceptor for error handling
@@ -50,7 +50,11 @@ export class MealieClient {
             error.response.data
           );
         } else if (error.request) {
-          throw new MealieApiError(`Network Error: No response received. ${error.message}`);
+          throw new MealieApiError(
+            `Network Error: Request to ${error.config?.url} failed. ${error.message}`,
+            undefined,
+            { config: error.config, code: error.code }
+          );
         } else {
           throw new MealieApiError(`Request Setup Error: ${error.message}`);
         }
@@ -58,22 +62,22 @@ export class MealieClient {
     );
   }
 
-  public async get<T>(url: string, params?: Record<string, any>): Promise<T> {
+  public async get<T = unknown>(url: string, params?: Record<string, unknown>): Promise<T> {
     const response = await this.client.get<T>(url, { params });
     return response.data;
   }
 
-  public async post<T>(url: string, data?: any, config?: AxiosRequestConfig): Promise<T> {
+  public async post<T = unknown>(url: string, data?: unknown, config?: AxiosRequestConfig): Promise<T> {
     const response = await this.client.post<T>(url, data, config);
     return response.data;
   }
 
-  public async put<T>(url: string, data?: any, config?: AxiosRequestConfig): Promise<T> {
+  public async put<T = unknown>(url: string, data?: unknown, config?: AxiosRequestConfig): Promise<T> {
     const response = await this.client.put<T>(url, data, config);
     return response.data;
   }
 
-  public async patch<T>(url: string, data?: any): Promise<T> {
+  public async patch<T = unknown>(url: string, data?: unknown): Promise<T> {
     const response = await this.client.patch<T>(url, data);
     return response.data;
   }

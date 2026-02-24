@@ -6,6 +6,9 @@ import * as path from "path";
 import FormData from "form-data";
 import * as crypto from "crypto";
 import { AgentRecipeSchema } from "../models/schema";
+import { RecipeInput, RecipeOutput, TagOut, CategoryOut, RecipeToolOut, PaginatedResponse, IngredientUnitInput, IngredientFoodInput, RecipeIngredientInput, RecipeStep, RecipeTag, RecipeCategory, RecipeTool } from "../models/types";
+
+import { tagToRecipeTag, categoryToRecipeCategory, toolToRecipeTool } from "../utils/mappers";
 
 export function setupRecipeCommands(program: Command) {
   const recipeCmd = program.command("recipe").description("Manage recipes");
@@ -16,7 +19,7 @@ export function setupRecipeCommands(program: Command) {
     .requiredOption("--data <path>", "Path to the JSON file or JSON string")
     .action((options) => {
       handleAction(async () => {
-        let inputData: any;
+        let inputData: unknown;
 
         try {
           // Check if data is a file path or direct JSON
@@ -29,8 +32,8 @@ export function setupRecipeCommands(program: Command) {
           } else {
             inputData = JSON.parse(options.data);
           }
-        } catch (e: any) {
-          throw new Error(`Failed to parse input data: ${e.message}`);
+        } catch (e: unknown) {
+          throw new Error(`Failed to parse input data: ${(e as Error).message}`);
         }
 
         // Validate using Zod
@@ -48,7 +51,11 @@ export function setupRecipeCommands(program: Command) {
         });
 
         // 2. Get the full recipe skeleton
-        const recipeData = await client.get<any>(`/api/recipes/${initialSlug}`);
+        const recipeData = await client.get<RecipeInput>(`/api/recipes/${initialSlug}`);
+
+        if (!recipeData.slug) {
+          throw new Error(`Recipe skeleton missing required field: slug`);
+        }
 
         // 3. Populate the skeleton with Agent data
         if (agentRecipe.description) recipeData.description = agentRecipe.description;
@@ -60,39 +67,47 @@ export function setupRecipeCommands(program: Command) {
         if (agentRecipe.cookTime) {
           recipeData.performTime = agentRecipe.cookTime;
         }
-        if (agentRecipe.performTime) {
-          // If the agent explicitly provides performTime, we'll map it to cookTime just in case
-          recipeData.cookTime = agentRecipe.performTime;
-        }
         if (agentRecipe.recipeYield) recipeData.recipeYield = agentRecipe.recipeYield;
         if (agentRecipe.recipeServings !== undefined) recipeData.recipeServings = agentRecipe.recipeServings;
 
         // Ensure tags, categories, tools
-        if (agentRecipe.tags) {
-          const resolvedTags = [];
-          for (const t of agentRecipe.tags) {
-            const found = await ensureOrganizer(client, "/api/organizers/tags", t);
-            if (found) resolvedTags.push(found);
+        if (agentRecipe.tags && agentRecipe.tags.length > 0) {
+          const resolvedTags = await Promise.all(
+            agentRecipe.tags.map(t => ensureOrganizer<TagOut>(client, "/api/organizers/tags", t))
+          );
+          const validTags = resolvedTags.filter(Boolean);
+          if (validTags.length !== agentRecipe.tags.length) {
+            console.error(`Warning: Only ${validTags.length}/${agentRecipe.tags.length} tags were resolved`);
           }
-          recipeData.tags = resolvedTags;
+          recipeData.tags = validTags.map(tagToRecipeTag);
+        } else if (agentRecipe.tags && agentRecipe.tags.length === 0) {
+          recipeData.tags = [];
         }
 
-        if (agentRecipe.categories) {
-          const resolvedCats = [];
-          for (const c of agentRecipe.categories) {
-            const found = await ensureOrganizer(client, "/api/organizers/categories", c);
-            if (found) resolvedCats.push(found);
+        if (agentRecipe.categories && agentRecipe.categories.length > 0) {
+          const resolvedCats = await Promise.all(
+            agentRecipe.categories.map(c => ensureOrganizer<CategoryOut>(client, "/api/organizers/categories", c))
+          );
+          const validCats = resolvedCats.filter(Boolean);
+          if (validCats.length !== agentRecipe.categories.length) {
+            console.error(`Warning: Only ${validCats.length}/${agentRecipe.categories.length} categories were resolved`);
           }
-          recipeData.recipeCategory = resolvedCats;
+          recipeData.recipeCategory = validCats.map(categoryToRecipeCategory);
+        } else if (agentRecipe.categories && agentRecipe.categories.length === 0) {
+          recipeData.recipeCategory = [];
         }
 
-        if (agentRecipe.tools) {
-          const resolvedTools = [];
-          for (const t of agentRecipe.tools) {
-            const found = await ensureOrganizer(client, "/api/organizers/tools", t);
-            if (found) resolvedTools.push(found);
+        if (agentRecipe.tools && agentRecipe.tools.length > 0) {
+          const resolvedTools = await Promise.all(
+            agentRecipe.tools.map(t => ensureOrganizer<RecipeToolOut>(client, "/api/organizers/tools", t))
+          );
+          const validTools = resolvedTools.filter(Boolean);
+          if (validTools.length !== agentRecipe.tools.length) {
+            console.error(`Warning: Only ${validTools.length}/${agentRecipe.tools.length} tools were resolved`);
           }
-          recipeData.tools = resolvedTools;
+          recipeData.tools = validTools.map(toolToRecipeTool);
+        } else if (agentRecipe.tools && agentRecipe.tools.length === 0) {
+          recipeData.tools = [];
         }
 
         // Map ingredients and instructions
@@ -101,14 +116,20 @@ export function setupRecipeCommands(program: Command) {
           recipeData.recipeIngredient = await Promise.all(
             agentRecipe.ingredients.map(async (ing) => {
               const id = crypto.randomUUID();
+              
+              const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+              if (!uuidRegex.test(id)) {
+                throw new Error(`Generated invalid UUID: ${id}`);
+              }
+              
               ingredientIds.push(id);
               if (typeof ing === "string") {
                 return {
                   referenceId: id,
                   note: ing,
-                };
+                } as RecipeIngredientInput;
               } else {
-                const ingObj: any = {
+                const ingObj: Partial<RecipeIngredientInput> = {
                   referenceId: id,
                   note: ing.note || "",
                 };
@@ -123,19 +144,19 @@ export function setupRecipeCommands(program: Command) {
                     fraction: ing.unit.fraction ?? true,
                     abbreviation: ing.unit.abbreviation || ""
                   };
-                  const resolvedUnit = await ensureOrganizer(client, "/api/units", ing.unit.name, extraData);
-                  if (resolvedUnit) ingObj.unit = resolvedUnit;
+                  const resolvedUnit = await ensureOrganizer<IngredientUnitInput>(client, "/api/units", ing.unit.name, extraData);
+                  if (resolvedUnit) ingObj.unit = resolvedUnit as unknown as IngredientUnitInput;
                 }
                 
                 if (ing.food && ing.food.name) {
                   const extraData = {
                     description: ing.food.description || ""
                   };
-                  const resolvedFood = await ensureOrganizer(client, "/api/foods", ing.food.name, extraData);
-                  if (resolvedFood) ingObj.food = resolvedFood;
+                  const resolvedFood = await ensureOrganizer<IngredientFoodInput>(client, "/api/foods", ing.food.name, extraData);
+                  if (resolvedFood) ingObj.food = resolvedFood as unknown as IngredientFoodInput;
                 }
                 
-                return ingObj;
+                return ingObj as RecipeIngredientInput;
               }
             })
           );
@@ -144,28 +165,31 @@ export function setupRecipeCommands(program: Command) {
         if (agentRecipe.instructions) {
           recipeData.recipeInstructions = agentRecipe.instructions.map((inst) => {
             if (typeof inst === "string") {
-              return { title: "", summary: "", text: inst, ingredientReferences: [] };
+              return { title: "", summary: "", text: inst, ingredientReferences: [] } as unknown as RecipeStep;
             } else {
               const refs = inst.ingredientIndices
-                ? inst.ingredientIndices.map((idx) => {
-                    if (ingredientIds[idx]) {
-                      return { referenceId: ingredientIds[idx] };
-                    }
-                    return null;
-                  }).filter(Boolean)
+                ? inst.ingredientIndices
+                    .filter((idx) => Number.isInteger(idx) && idx >= 0 && idx < ingredientIds.length)
+                    .map((idx) => ({ referenceId: ingredientIds[idx] }))
                 : [];
+                
+              const refIds = new Set(refs.map(r => r.referenceId));
+              if (refIds.size !== refs.length) {
+                console.warn(`Warning: Duplicate ingredient references in instruction: "${inst.text || ''}"`);
+              }
+
               return {
                 title: inst.section || "",
                 summary: inst.title || "",
                 text: inst.text,
                 ingredientReferences: refs,
-              };
+              } as unknown as RecipeStep;
             }
           });
         }
 
         // 4. Update the recipe with the populated data
-        const updatedRecipe = await client.put<any>(
+        const updatedRecipe = await client.put<RecipeOutput>(
           `/api/recipes/${initialSlug}`,
           recipeData
         );
@@ -175,17 +199,24 @@ export function setupRecipeCommands(program: Command) {
           const imagePath = path.resolve(agentRecipe.image);
           if (fs.existsSync(imagePath)) {
             const formData = new FormData();
-            formData.append("image", fs.createReadStream(imagePath));
-            formData.append("extension", path.extname(imagePath).replace(".", ""));
+            let imageStream: fs.ReadStream | undefined;
 
             try {
+              imageStream = fs.createReadStream(imagePath);
+              formData.append("image", imageStream);
+              formData.append("extension", path.extname(imagePath).replace(".", ""));
+
               await client.put(`/api/recipes/${updatedRecipe.slug || initialSlug}/image`, formData, {
                 headers: {
                   ...formData.getHeaders(),
                 },
               });
-            } catch (imgError: any) {
-              throw new Error(`Failed to upload image: ${imgError.message}`);
+            } catch (imgError: unknown) {
+              throw new Error(`Failed to upload image: ${(imgError as Error).message}`);
+            } finally {
+              if (imageStream) {
+                imageStream.destroy();
+              }
             }
           } else {
             throw new Error(`Image file not found at path: ${imagePath}`);
@@ -204,7 +235,7 @@ export function setupRecipeCommands(program: Command) {
     .action((options) => {
       handleAction(async () => {
         const client = getClient();
-        const recipe = await client.get<any>(`/api/recipes/${options.slug}`);
+        const recipe = await client.get<RecipeOutput>(`/api/recipes/${options.slug}`);
 
         if (options.concise) {
           return {
@@ -216,7 +247,7 @@ export function setupRecipeCommands(program: Command) {
             totalTime: recipe.totalTime,
             prepTime: recipe.prepTime,
             cookTime: recipe.performTime, // Map Mealie's performTime to Cook Time
-            performTime: recipe.cookTime,
+            performTime: recipe.performTime,
             tags: recipe.tags,
             categories: recipe.recipeCategory,
             tools: recipe.tools,
@@ -241,7 +272,7 @@ export function setupRecipeCommands(program: Command) {
     .action((options) => {
       handleAction(async () => {
         const client = getClient();
-        const params: any = {};
+        const params: Record<string, unknown> = {};
         
         if (options.query) params.search = options.query;
         if (options.tags) params.tags = options.tags.split(",");
@@ -256,7 +287,7 @@ export function setupRecipeCommands(program: Command) {
           if (options.foods) params.requireAllFoods = true;
         }
 
-        const recipes = await client.get<any>("/api/recipes", params);
+        const recipes = await client.get<PaginatedResponse<RecipeOutput>>("/api/recipes", params);
         return recipes; // Returns paginated result
       });
     });

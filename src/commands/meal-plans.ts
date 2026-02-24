@@ -1,6 +1,7 @@
 import { Command } from "commander";
 import { getClient } from "../api";
 import { handleAction } from "../utils";
+import { CreatePlanEntry, ReadPlanEntry, RecipeOutput } from "../models/types";
 
 export function setupMealPlanCommands(program: Command) {
   const planCmd = program.command("meal-plan").description("Manage meal plans");
@@ -15,15 +16,19 @@ export function setupMealPlanCommands(program: Command) {
     .option("--text <text>", "Text description of the entry (if no recipe)")
     .action((options) => {
       handleAction(async () => {
+        if (!/^\d{4}-\d{2}-\d{2}$/.test(options.date) || isNaN(Date.parse(options.date))) {
+          throw new Error("Invalid date format. Please use a valid YYYY-MM-DD format.");
+        }
+
         const client = getClient();
-        let recipeId: string | null = null;
+        let recipeId: string | null | undefined = null;
 
         if (options.recipeSlug) {
-          const recipe = await client.get<any>(`/api/recipes/${options.recipeSlug}`);
+          const recipe = await client.get<RecipeOutput>(`/api/recipes/${options.recipeSlug}`);
           recipeId = recipe.id;
         }
 
-        const payload: any = {
+        const payload: Partial<CreatePlanEntry> = {
           date: options.date,
           entryType: options.entryType,
         };
@@ -35,7 +40,7 @@ export function setupMealPlanCommands(program: Command) {
           payload.text = options.text || "";
         }
 
-        const created = await client.post<any>("/api/households/mealplans", payload);
+        const created = await client.post<CreatePlanEntry>("/api/households/mealplans", payload);
         return created;
       });
     });
@@ -46,7 +51,7 @@ export function setupMealPlanCommands(program: Command) {
     .action(() => {
       handleAction(async () => {
         const client = getClient();
-        const plan = await client.get<any>("/api/households/mealplans/today");
+        const plan = await client.get<ReadPlanEntry[]>("/api/households/mealplans/today");
         return plan;
       });
     });

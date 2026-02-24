@@ -1,9 +1,12 @@
-export function outputSuccess(data: any): void {
+import { MealieClient, MealieApiError } from "../api";
+import { PaginatedResponse } from "../models/types";
+
+export function outputSuccess(data: unknown): void {
   console.log(JSON.stringify({ status: "success", data }, null, 2));
 }
 
-export function outputError(message: string, details?: any): void {
-  const output: any = { status: "error", message };
+export function outputError(message: string, details?: unknown): void {
+  const output: Record<string, unknown> = { status: "error", message };
   if (details !== undefined) {
     output.details = details;
   }
@@ -11,21 +14,38 @@ export function outputError(message: string, details?: any): void {
   process.exitCode = 1;
 }
 
-export async function ensureOrganizer(client: any, endpoint: string, name: string, extraData: any = {}) {
-  const res = await client.get(endpoint, { search: name });
-  const items = res.items || res;
-  let found = items.find((i: any) => i.name.toLowerCase() === name.toLowerCase());
+export function extractItems<T>(response: PaginatedResponse<T> | T[] | unknown): T[] {
+  if (Array.isArray(response)) return response as T[];
+  if (response && typeof response === "object" && "items" in response) {
+    const paginated = response as PaginatedResponse<T>;
+    return Array.isArray(paginated.items) ? paginated.items : [];
+  }
+  return [];
+}
+
+export async function ensureOrganizer<T extends { name: string }>(client: MealieClient, endpoint: string, name: string, extraData: Record<string, unknown> = {}): Promise<T> {
+  const res = await client.get<PaginatedResponse<T> | T[]>(endpoint, { search: name });
+  const items = extractItems<T>(res);
+  let found = items.find((i) => i.name.toLowerCase() === name.toLowerCase());
 
   if (!found) {
     try {
-      found = await client.post(endpoint, { name, ...extraData });
+      found = await client.post<T>(endpoint, { name, ...extraData });
     } catch (e) {
-      // If it fails (e.g., already exists but wasn't in list), try one more fetch
-      const res2 = await client.get(endpoint, { search: name });
-      const items2 = res2.items || res2;
-      found = items2.find((i: any) => i.name.toLowerCase() === name.toLowerCase());
+      const apiError = e as MealieApiError;
+      // Solo reintentar si es un posible race condition (409 conflict o 500)
+      if (apiError.statusCode === 409 || (apiError.statusCode && apiError.statusCode >= 500)) {
+        const res2 = await client.get<PaginatedResponse<T> | T[]>(endpoint, { search: name });
+        const items2 = extractItems<T>(res2);
+        found = items2.find((i) => i.name.toLowerCase() === name.toLowerCase());
+      }
+      
+      if (!found) {
+        throw new Error(`Failed to create or find organizer: ${name}. API Error: ${apiError.message}`);
+      }
     }
   }
+
   return found;
 }
 
@@ -34,14 +54,16 @@ export function handleAction<T>(action: () => Promise<T>): Promise<void> {
     .then((data) => {
       outputSuccess(data);
     })
-    .catch((error: any) => {
-      if (error.name === "MealieApiError") {
+    .catch((error: unknown) => {
+      if (error instanceof MealieApiError) {
         outputError(error.message, {
           statusCode: error.statusCode,
           responseData: error.responseData,
         });
+      } else if (error instanceof Error) {
+        outputError(error.message, error.stack);
       } else {
-        outputError(error.message || "An unexpected error occurred", error.stack);
+        outputError("An unexpected error occurred", String(error));
       }
     });
 }
