@@ -7,35 +7,6 @@ import FormData from "form-data";
 import * as crypto from "crypto";
 import { AgentRecipeSchema } from "../models/schema";
 
-function parseTime(timeStr: string | undefined): string | undefined {
-  if (!timeStr) return undefined;
-
-  let hours = 0;
-  let minutes = 0;
-
-  const hMatch = timeStr.match(/(\d+)\s*(?:h|hr|hrs|hour|hours)/i);
-  if (hMatch) hours = parseInt(hMatch[1], 10);
-
-  const mMatch = timeStr.match(/(\d+)\s*(?:m|min|mins|minute|minutes)/i);
-  if (mMatch) minutes = parseInt(mMatch[1], 10);
-
-  // If no specific unit is found but there's a number, assume minutes
-  if (hours === 0 && minutes === 0) {
-    const rawMatch = timeStr.match(/^(\d+)$/);
-    if (rawMatch) {
-      minutes = parseInt(rawMatch[1], 10);
-    } else {
-      // If it's already in the format like "20m" or completely unparseable, return as is
-      return timeStr;
-    }
-  }
-
-  const totalMinutes = (hours * 60) + minutes;
-  if (totalMinutes === 0 && timeStr !== "0") return timeStr; // Fallback
-  
-  return `${totalMinutes}m`;
-}
-
 export function setupRecipeCommands(program: Command) {
   const recipeCmd = program.command("recipe").description("Manage recipes");
 
@@ -82,10 +53,17 @@ export function setupRecipeCommands(program: Command) {
         // 3. Populate the skeleton with Agent data
         if (agentRecipe.description) recipeData.description = agentRecipe.description;
         if (agentRecipe.orgURL) recipeData.orgURL = agentRecipe.orgURL;
-        if (agentRecipe.prepTime) recipeData.prepTime = parseTime(agentRecipe.prepTime);
-        if (agentRecipe.cookTime) recipeData.cookTime = parseTime(agentRecipe.cookTime);
-        if (agentRecipe.totalTime) recipeData.totalTime = parseTime(agentRecipe.totalTime);
-        if (agentRecipe.performTime) recipeData.performTime = parseTime(agentRecipe.performTime);
+        if (agentRecipe.prepTime) recipeData.prepTime = agentRecipe.prepTime;
+        if (agentRecipe.totalTime) recipeData.totalTime = agentRecipe.totalTime;
+        
+        // Mealie UI quirk: The "Cook time" shown in the UI is actually the `performTime` field in the API
+        if (agentRecipe.cookTime) {
+          recipeData.performTime = agentRecipe.cookTime;
+        }
+        if (agentRecipe.performTime) {
+          // If the agent explicitly provides performTime, we'll map it to cookTime just in case
+          recipeData.cookTime = agentRecipe.performTime;
+        }
         if (agentRecipe.recipeYield) recipeData.recipeYield = agentRecipe.recipeYield;
         if (agentRecipe.recipeServings !== undefined) recipeData.recipeServings = agentRecipe.recipeServings;
 
@@ -237,8 +215,8 @@ export function setupRecipeCommands(program: Command) {
             recipeServings: recipe.recipeServings,
             totalTime: recipe.totalTime,
             prepTime: recipe.prepTime,
-            cookTime: recipe.cookTime,
-            performTime: recipe.performTime,
+            cookTime: recipe.performTime, // Map Mealie's performTime to Cook Time
+            performTime: recipe.cookTime,
             tags: recipe.tags,
             categories: recipe.recipeCategory,
             tools: recipe.tools,
