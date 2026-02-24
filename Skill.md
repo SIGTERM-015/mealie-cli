@@ -29,6 +29,8 @@ Generate a JSON file (e.g., `recipe.json`) adhering to this schema. You do NOT n
   "orgURL": "https://es.wikipedia.org/wiki/Pizza_margarita",
   "prepTime": "15m",
   "cookTime": "10m",
+  "totalTime": "25m",
+  "performTime": "10m",
   "recipeYield": "2 pizzas",
   "recipeServings": 4,
   "tags": ["pizza", "italiana"],

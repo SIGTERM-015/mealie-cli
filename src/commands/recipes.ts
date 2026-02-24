@@ -55,6 +55,8 @@ export function setupRecipeCommands(program: Command) {
         if (agentRecipe.orgURL) recipeData.orgURL = agentRecipe.orgURL;
         if (agentRecipe.prepTime) recipeData.prepTime = agentRecipe.prepTime;
         if (agentRecipe.cookTime) recipeData.cookTime = agentRecipe.cookTime;
+        if (agentRecipe.totalTime) recipeData.totalTime = agentRecipe.totalTime;
+        if (agentRecipe.performTime) recipeData.performTime = agentRecipe.performTime;
         if (agentRecipe.recipeYield) recipeData.recipeYield = agentRecipe.recipeYield;
         if (agentRecipe.recipeServings !== undefined) recipeData.recipeServings = agentRecipe.recipeServings;
 
@@ -207,6 +209,7 @@ export function setupRecipeCommands(program: Command) {
             totalTime: recipe.totalTime,
             prepTime: recipe.prepTime,
             cookTime: recipe.cookTime,
+            performTime: recipe.performTime,
             tags: recipe.tags,
             categories: recipe.recipeCategory,
             tools: recipe.tools,

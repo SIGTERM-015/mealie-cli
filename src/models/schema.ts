@@ -38,6 +38,8 @@ export const AgentRecipeSchema = z.object({
   image: z.string().optional(),
   prepTime: z.string().optional(),
   cookTime: z.string().optional(),
+  totalTime: z.string().optional(),
+  performTime: z.string().optional(),
   recipeYield: z.string().optional(),
   recipeServings: z.number().optional(),
   tags: z.array(z.string()).optional(),
