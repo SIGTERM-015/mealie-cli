@@ -63,6 +63,10 @@ Generate a JSON file (e.g., `recipe.json`) adhering to this schema. You do NOT n
       "ingredientIndices": [0, 1, 2, 3]
     },
     {
+      "title": "Primer levado",
+      "text": "Pasadas 24 horas, dividir la masa en dos porciones iguales y bolear."
+    },
+    {
       "section": "MONTAR LA PIZZA",
       "title": "Añadir ingredientes",
       "text": "Estirar la masa y añadir la salsa de tomate y la mozzarella.",
@@ -78,7 +82,7 @@ Generate a JSON file (e.g., `recipe.json`) adhering to this schema. You do NOT n
 }
 ```
 
-*Note: All fields except `name`, `ingredients`, and `instructions` are optional. **CRITICAL:** You MUST specify `recipeServings` (as a number) whenever possible to enable portion scaling in Mealie. Furthermore, you MUST NOT skip the detailed ingredient structures. The `ingredients` array MUST contain detailed objects containing `quantity`, `unit` (with `name` and `abbreviation`), `food` (with `name`), `note`, and `display` for full control over how the ingredient is parsed in Mealie. Do NOT use simple strings for ingredients unless the source material is completely unparseable. The `instructions` array can contain simple strings, or objects with `section` (for section headers), `title` (for the step name), `text` (for the actual instruction), and `ingredientIndices` (an array of numbers corresponding to the zero-based index of the items in your `ingredients` array, which automatically links the ingredients to the step!). **UI QUIRK WARNING:** In Mealie, the "Cook Time" shown in the user interface is mapped to the `performTime` field in the API. If you need to specify a cooking time, use the `performTime` field. Do NOT use `cookTime` to avoid confusing the UI.*
+*Note: All fields except `name`, `ingredients`, and `instructions` are optional. **CRITICAL:** You MUST specify `recipeServings` (as a number) whenever possible to enable portion scaling in Mealie. Furthermore, you MUST NOT skip the detailed ingredient structures. The `ingredients` array MUST contain detailed objects containing `quantity`, `unit` (with `name` and `abbreviation`), `food` (with `name`), `note`, and `display` for full control over how the ingredient is parsed in Mealie. Do NOT use simple strings for ingredients unless the source material is completely unparseable. The `instructions` array can contain simple strings, or objects with `section` (for section headers), `title` (for the step name), `text` (for the actual instruction), and `ingredientIndices` (an array of numbers corresponding to the zero-based index of the items in your `ingredients` array, which automatically links the ingredients to the step!). **INSTRUCTION SECTIONS:** To group instructions under a section, provide a `section` string on the FIRST instruction of that group. For subsequent instructions in the same section, omit the `section` field. **UI QUIRK WARNING:** In Mealie, the "Cook Time" shown in the user interface is mapped to the `performTime` field in the API. If you need to specify a cooking time, use the `performTime` field. Do NOT use `cookTime` to avoid confusing the UI.*
 
 ### Step 2: Execute the Command
 Run the CLI passing the path to the JSON file you just created:
